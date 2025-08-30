@@ -1,0 +1,140 @@
+(* --- Parameter --- *)
+free ID_MS: bitstring[private].
+free K_MS: bitstring[private].
+free K_RC: bitstring[private].
+
+free URi_table:bitstring[private].
+free MS_table:bitstring[private].
+
+(* --- Channel --- *)
+free pch: channel.
+
+(* --- Database --- *)
+table MS_DB(bitstring, bitstring, bitstring, bitstring).
+table URi_DB(bitstring, bitstring, bitstring, bitstring, bitstring, bitstring).
+
+(* --- Function --- *)
+fun h(bitstring): bitstring.
+fun xor(bitstring, bitstring): bitstring.
+fun puf(bitstring): bitstring [private].
+fun bio_gen_bk(bitstring): bitstring.
+fun bio_gen_rp(bitstring): bitstring.
+fun computeVe(bitstring): bitstring. (* --- Vi^a XOR Vi^b ---*)
+fun senc(bitstring, bitstring): bitstring.
+fun senc_local(bitstring, bitstring, bitstring, bitstring): bitstring.
+fun gen_tag(bitstring, bitstring): bitstring.
+
+reduc forall m:bitstring, k:bitstring; sdec(senc(m,k),k)=m.
+reduc forall n:bitstring, a:bitstring, m:bitstring, k:bitstring; sdec_local(n, a, senc_local(n, a, m, k), k)=m.
+reduc forall b:bitstring; bio_rep(b, bio_gen_rp(b))=bio_gen_bk(b).
+equation forall x:bitstring, y:bitstring; xor(xor(x,y),y)=x.
+
+(* --- Event --- *)
+event URi_Local_Start().
+event URi_Local_End().
+event MS_Auth_URi(bitstring, bitstring, bitstring, bitstring).
+event URi_Auth_MS(bitstring, bitstring, bitstring, bitstring).
+event SK_Est_MS(bitstring, bitstring, bitstring, bitstring, bitstring, bitstring).
+event SK_Est_URi(bitstring, bitstring, bitstring, bitstring, bitstring, bitstring).
+
+(* --- Local & Authentication & Key exchange Phase --- *)
+let URi_LocalAndAuth_step(ID_i':bitstring, PW_i':bitstring, BIO_i':bitstring)=
+event URi_Local_Start();
+get URi_DB(=URi_table, TID_i, Wi, CT_i, TAG_i, MX2) in
+let Vi'=h((ID_i', PW_i')) in
+let temp=xor(Wi, Vi') in
+let (ri':bitstring, RP_i':bitstring)=temp in
+let BK_i'=bio_rep(BIO_i', RP_i') in
+let EK_i'=xor(computeVe(Vi'), BK_i') in
+let (PID_i:bitstring, Ki:bitstring)=sdec_local(ri', ID_i', CT_i, EK_i') in
+let TAG_i'=gen_tag((PID_i, Ki), EK_i') in
+if (TAG_i=TAG_i') then
+
+event URi_Local_End(); (*Authentication step1*)
+let Pi=puf(Ki) in
+let X_i=xor(MX2, h((Pi, PID_i))) in
+new RN_i:bitstring;
+new TS1:bitstring;
+let CT_1=senc((RN_i, PID_i), X_i) in
+let TAG1=gen_tag((RN_i, PID_i, TID_i), X_i) in
+out (pch, (TS1, CT_1, TAG1, TID_i)); (*Authentication step2*)
+
+in (pch, (TS2:bitstring, CT_2:bitstring, TAG2:bitstring));
+let (RN_MS':bitstring, RN_i_check:bitstring)=sdec(CT_2, X_i) in
+let TAG2'=gen_tag((RN_MS', RN_i, PID_i), X_i) in
+if (TAG2=TAG2') then
+if (RN_i=RN_i_check) then
+event URi_Auth_MS(RN_i, RN_MS', X_i, PID_i);
+let SK_URi=h((RN_MS', RN_i, X_i)) in
+event SK_Est_URi(RN_i, RN_MS', X_i, PID_i, ID_MS, SK_URi). (*URi established session key and Authentication step5*)
+
+let MS_Auth_step()=
+in (pch, (TS1:bitstring, CT_1:bitstring, TAG1:bitstring, TID_i:bitstring));
+get MS_DB(=MS_table, TID_i_new, TID_i_old, MX1) in
+if (TID_i=TID_i_new) then
+let P_MS=puf(K_MS) in
+let X_i=xor(MX1, h((P_MS, ID_MS))) in
+let (RN_i':bitstring, PID_i':bitstring)=sdec(CT_1, X_i) in
+let TAG1'=gen_tag((RN_i', PID_i', TID_i), X_i) in
+if (TAG1=TAG1') then
+new RN_MS:bitstring;
+new TS2:bitstring;
+event MS_Auth_URi(RN_i', RN_MS, X_i, PID_i'); (*Authentication stpe3*)
+let CT_2=senc((RN_MS, RN_i'), X_i) in
+let TAG2=gen_tag((RN_MS, RN_i', PID_i'), X_i) in
+let SK_MS=h((RN_MS, RN_i', X_i)) in
+event SK_Est_MS(RN_i', RN_MS, X_i, PID_i', ID_MS, SK_MS); (*MS established session key*)
+out (pch, (TS2, CT_2, TAG2)). (*Authentication step4*)
+
+(* --- Query --- *)
+query attacker(K_MS).
+query attacker(K_RC).
+query attacker(ID_MS).
+
+query inj-event(URi_Local_End()) ==> inj-event(URi_Local_Start()).
+query rni:bitstring, rnms:bitstring, xi:bitstring, pid:bitstring;
+inj-event(URi_Auth_MS(rni, rnms, xi, pid)) ==> inj-event(MS_Auth_URi(rni, rnms, xi, pid)).
+
+query pid:bitstring, id:bitstring, rni:bitstring, rnms:bitstring, xi:bitstring, sk:bitstring;
+event(SK_Est_MS(rni, rnms, xi, pid, id, sk)).
+query pid:bitstring, id:bitstring, rni:bitstring, rnms:bitstring, xi:bitstring, sk:bitstring;
+event(SK_Est_URi(rni, rnms, xi, pid, id, sk)).
+query pid:bitstring, id:bitstring, rni:bitstring, rnms:bitstring, xi:bitstring, sk_ms:bitstring, sk_uri:bitstring; 
+event(SK_Est_MS(rni, rnms, xi, pid, id, sk_ms)) && event(SK_Est_URi(rni, rnms, xi, pid, id, sk_uri)) ==> sk_ms=sk_uri.
+query pid:bitstring, id:bitstring, rni:bitstring, rnms:bitstring, xi:bitstring, sk:bitstring;
+event(SK_Est_MS(rni, rnms, xi, pid, id, sk)) && attacker(sk).
+query pid:bitstring, id:bitstring, rni:bitstring, rnms:bitstring, xi:bitstring, sk:bitstring;
+event(SK_Est_URi(rni, rnms, xi, pid, id, sk)) && attacker(sk).
+
+(* --- Process --- *)
+process 
+new ID_i:bitstring;
+new PW_i:bitstring;
+new BIO_i:bitstring;
+new Ki:bitstring;
+new ri:bitstring;
+new TID_i_old:bitstring;
+new TID_i_new:bitstring;
+
+let TID_i=TID_i_new in
+let PID_i=h((ID_i, ID_MS, K_MS)) in
+let X_i=h((K_RC, PID_i, ID_MS, ri)) in
+
+(*Medical server*)
+let P_MS=puf(K_MS) in
+let MX1=xor(X_i, h((P_MS, ID_MS))) in
+insert MS_DB(MS_table, TID_i_new, TID_i_old, MX1);
+
+(*User*)
+let BK_i=bio_gen_bk(BIO_i) in
+let RP_i=bio_gen_rp(BIO_i) in
+let Vi=h((ID_i, PW_i)) in
+let Wi=xor((ri, RP_i), Vi) in
+let EK_i=xor(computeVe(Vi), BK_i) in
+let CT_i=senc_local(ri, ID_i, (PID_i, Ki), EK_i) in 
+let TAG_i=gen_tag((PID_i, Ki), EK_i) in
+let Pi=puf(Ki) in
+let MX2=xor(X_i, h((Pi, PID_i))) in 
+insert URi_DB(URi_table, TID_i, Wi, CT_i, TAG_i, MX2);
+
+(!URi_LocalAndAuth_step(ID_i, PW_i, BIO_i)) | (!MS_Auth_step())
