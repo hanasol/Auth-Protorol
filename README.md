@@ -10,7 +10,7 @@ The proposed protocol leverages three-factor authentication to strengthen the se
 
 The Registration Phase and Authentication and Key Exchange Phase of the protocol are modeled in ProVerif to analyze security properties.
 
-- protocol_v1_anonymity.pv: Models user anonymity using observational equivalence between two possible user identities (choice).
+- protocol_v1_anonymity.pv: Models user anonymity using observational equivalence between two possible user identities.
 
 - protocol_v1_auth_key_pw.pv: Includes queries for local and mutual authentication, session-key establishment, agreement, and secrecy, long-term secret confidentiality, and password secrecy and offline-guessing resistance.
 
