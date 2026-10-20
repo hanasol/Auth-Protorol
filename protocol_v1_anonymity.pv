@@ -110,7 +110,6 @@ let MS_Auth_step() =
 
 (* --- Query --- *)
 (* MODEL-ONLY: choice in the process triggers anonymity equivalence checking. *)
-(* Ordinary queries/weaksecret cannot be combined with choice in ProVerif 2.05. *)
 
 (* --- Process --- *)
 process
