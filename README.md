@@ -8,10 +8,16 @@ The proposed protocol leverages three-factor authentication to strengthen the se
 
 ## ProVerif Code
 
-The Registration Phase and Authentication and Key Exchange Phase of the protocol are implemented in ProVerif to verify the security properties. Using ProVerif, the protocol is validated for session key consistency, key leakage prevention, and session synchronization through specific queries.
+The Registration Phase and Authentication and Key Exchange Phase of the protocol are modeled in ProVerif to analyze security properties.
+
+- protocol_v1_anonymity.pv: Models user anonymity using observational equivalence between two possible user identities (choice).
+
+- protocol_v1_auth_key_pw.pv: Includes queries for local and mutual authentication, session-key establishment, agreement, and secrecy, long-term secret confidentiality, and password secrecy and offline-guessing resistance.
 
 ## Key Features
 
 - Enhanced security with Three-Factor Authentication.
+
 - Strong security provided by PUF (Physical Unclonable Function)-based authentication.
+
 - ProVerif-based security verification (session key consistency, key leakage prevention, session synchronization, etc.).
